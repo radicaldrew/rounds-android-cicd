@@ -1,0 +1,69 @@
+# .gitignore for Terraform Android CI/CD project
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+.terraform.tfstate.lock.info
+
+# Sensitive files
+*.jks
+*.keystore
+keystore.properties
+google-credentials.json
+service-account.json
+
+# Logs
+*.log
+crash.log
+crash.*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
+# Temporary directories
+tmp/
+temp/
+cache/
+
+# Build outputs (if testing locally)
+app/build/
+build/
+gradle/
+.gradle/
+
+# Android specific
+local.properties
