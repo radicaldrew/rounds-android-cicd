@@ -7,13 +7,13 @@ variable "project_id" {
 variable "region" {
   description = "The GCP region for resources"
   type        = string
-  default     = "me-west1"  
+  default     = "us-central1"  
 }
 
 variable "webhook_url" {
   type = string
   description = "Webhook URL for the build"
-  default     = "https://webhook.site/your-unique-id"
+  default     = "https://build-manager.siply.workers.dev/webhook"
   validation {
     condition     = can(regex("^https?://", var.webhook_url))
     error_message = "The webhook_url must be a valid HTTP or HTTPS URL."
@@ -41,13 +41,13 @@ variable "github_branch" {
 variable "build_timeout" {
   description = "Build timeout in seconds"
   type        = string
-  default     = "1200s"
+  default     = "1800s"
 }
 
 variable "machine_type" {
   description = "Machine type for Cloud Build"
   type        = string
-  default     = "E2_HIGHCPU_8"
+  default     = "E2_MEDIUM"
 }
 
 variable "disk_size_gb" {
@@ -125,7 +125,19 @@ variable "java_version" {
 variable "enable_signing" {
   description = "Enable APK signing with keystore"
   type        = bool
-  default     = false
+  default     = true
+}
+
+variable "enable_kms_encryption" {
+  description = "Enable KMS encryption for signing secrets"
+  type        = bool
+  default     = true
+}
+
+variable "key_rotation_period" {
+  description = "KMS key rotation period in seconds"
+  type        = string
+  default     = "2592000s" # 30 days
 }
 
 variable "keystore_password" {
@@ -163,19 +175,19 @@ variable "gradle_max_workers" {
 variable "gradle_memory" {
   description = "Gradle JVM memory allocation"
   type        = string
-  default     = "4g"
+  default     = "3g"
 }
 
 variable "enable_lint" {
   description = "Enable Android lint checks"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_unit_tests" {
   description = "Enable unit tests"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_integration_tests" {

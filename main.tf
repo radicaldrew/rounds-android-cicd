@@ -136,27 +136,6 @@ data "google_storage_project_service_account" "gcs_account" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Secret Manager secrets for Android signing
-resource "google_secret_manager_secret" "android_keystore" {
-  secret_id = "android-keystore"
-  
-  replication {
-    auto {}
-  }
-  
-  depends_on = [google_project_service.required_apis]
-}
-
-resource "google_secret_manager_secret" "keystore_properties" {
-  secret_id = "keystore-properties"
-  
-  replication {
-    auto {}
-  }
-  
-  depends_on = [google_project_service.required_apis]
-}
-
 # Cloud Build service account
 resource "google_service_account" "cloud_build_sa" {
   account_id   = "android-cicd-build-sa"
@@ -191,7 +170,7 @@ resource "google_cloudbuild_worker_pool" "cost_optimized_pool" {
   
   worker_config {
     disk_size_gb   = 100
-    machine_type   = "e2-highcpu-8"
+    machine_type   = "e2-highmem-2"
     no_external_ip = false
   }
   
