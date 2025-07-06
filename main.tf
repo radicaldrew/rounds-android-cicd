@@ -12,7 +12,8 @@ resource "google_project_service" "required_apis" {
     "monitoring.googleapis.com",
     "cloudfunctions.googleapis.com",
     "eventarc.googleapis.com",
-    "run.googleapis.com"
+    "run.googleapis.com",
+    "compute.googleapis.com"
   ])
   
   service = each.value
@@ -43,7 +44,7 @@ resource "google_storage_bucket" "source_uploads" {
   
   lifecycle_rule {
     condition {
-      age = 30
+      age = var.source_retention_days
     }
     action {
       type = "Delete"
@@ -66,7 +67,7 @@ resource "google_storage_bucket" "build_artifacts" {
   
   lifecycle_rule {
     condition {
-      age = 90
+      age = var.artifact_retention_days
     }
     action {
       type = "Delete"
@@ -85,7 +86,7 @@ resource "google_storage_bucket" "build_cache" {
   
   lifecycle_rule {
     condition {
-      age = 7
+      age = var.cache_retention_days
     }
     action {
       type = "Delete"
@@ -161,6 +162,8 @@ resource "google_service_account" "cloud_build_sa" {
   account_id   = "android-cicd-build-sa"
   display_name = "Android CI/CD Cloud Build Service Account"
   description  = "Service account for Android CI/CD Cloud Build operations"
+  
+  depends_on = [google_project_service.required_apis]
 }
 
 # IAM roles for Cloud Build service account
@@ -177,6 +180,8 @@ resource "google_project_iam_member" "cloud_build_sa_roles" {
   project = var.project_id
   role    = each.value
   member  = "serviceAccount:${google_service_account.cloud_build_sa.email}"
+  
+  depends_on = [google_service_account.cloud_build_sa]
 }
 
 # Cloud Build Worker Pool for cost optimization
@@ -188,64 +193,6 @@ resource "google_cloudbuild_worker_pool" "cost_optimized_pool" {
     disk_size_gb   = 100
     machine_type   = "e2-highcpu-8"
     no_external_ip = false
-  }
-  
-  depends_on = [google_project_service.required_apis]
-}
-
-# Log-based metrics for monitoring
-resource "google_logging_metric" "android_build_success" {
-  name   = "android_build_success"
-  filter = <<-EOT
-    resource.type="cloud_build"
-    logName="projects/${var.project_id}/logs/cloudbuild"
-    jsonPayload.status="SUCCESS"
-    jsonPayload.substitutions._PIPELINE_TYPE="android"
-  EOT
-  
-  metric_descriptor {
-    metric_kind = "GAUGE"
-    value_type  = "INT64"
-    display_name = "Android Build Success Count"
-  }
-  
-  depends_on = [google_project_service.required_apis]
-}
-
-resource "google_logging_metric" "android_build_failures" {
-  name   = "android_build_failures"
-  filter = <<-EOT
-    resource.type="cloud_build"
-    logName="projects/${var.project_id}/logs/cloudbuild"
-    jsonPayload.status="FAILURE"
-    jsonPayload.substitutions._PIPELINE_TYPE="android"
-  EOT
-  
-  metric_descriptor {
-    metric_kind = "GAUGE"
-    value_type  = "INT64"
-    display_name = "Android Build Failure Count"
-  }
-  
-  depends_on = [google_project_service.required_apis]
-}
-
-resource "google_logging_metric" "android_build_duration" {
-  name   = "android_build_duration"
-  filter = <<-EOT
-    resource.type="cloud_build"
-    logName="projects/${var.project_id}/logs/cloudbuild"
-    jsonPayload.status="SUCCESS"
-    jsonPayload.substitutions._PIPELINE_TYPE="android"
-  EOT
-  
-  value_extractor = "EXTRACT(jsonPayload.timing.BUILD.endTime) - EXTRACT(jsonPayload.timing.BUILD.startTime)"
-  
-  metric_descriptor {
-    metric_kind = "GAUGE"
-    value_type  = "DOUBLE"
-    unit        = "s"
-    display_name = "Android Build Duration"
   }
   
   depends_on = [google_project_service.required_apis]

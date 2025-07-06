@@ -6,10 +6,10 @@ terraform {
   required_version = ">= 1.0"
   
   # Configure remote state backend
-  # backend "gcs" {
-  #   bucket = "your-project-id-terraform-state"
-  #   prefix = "rounds/android-cicd"
-  # }
+  backend "gcs" {
+    bucket = "rounds-android-cicd-terraform-state"
+    prefix = "rounds/android-cicd"
+  }
   
   required_providers {
     google = {

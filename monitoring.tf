@@ -12,7 +12,7 @@ resource "google_monitoring_notification_channel" "email_channel" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Alert policy for build failures
+# Alert policy for build failures (fixed filter)
 resource "google_monitoring_alert_policy" "build_failure_alert" {
   count = var.enable_monitoring ? 1 : 0
   
@@ -23,9 +23,9 @@ resource "google_monitoring_alert_policy" "build_failure_alert" {
     display_name = "Build failure condition"
     
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/android_build_failures\""
+      filter          = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/android_build_failures\""
       duration        = "60s"
-      comparison      = "COMPARISON_GREATER_THAN"
+      comparison      = "COMPARISON_GT"
       threshold_value = 0
       
       aggregations {
@@ -39,38 +39,33 @@ resource "google_monitoring_alert_policy" "build_failure_alert" {
     auto_close = "86400s"
   }
   
-  dynamic "notification_channels" {
-    for_each = var.notification_email != "" ? [1] : []
-    content {
-      notification_channels = [google_monitoring_notification_channel.email_channel[0].id]
-    }
-  }
+  # Add notification channels if email is provided
+  notification_channels = var.notification_email != "" ? [google_monitoring_notification_channel.email_channel[0].id] : []
   
   depends_on = [
-    google_logging_metric.android_build_failures,
     google_project_service.required_apis
   ]
 }
 
-# Alert policy for long build times
-resource "google_monitoring_alert_policy" "long_build_alert" {
+# Alert policy for build success (for testing)
+resource "google_monitoring_alert_policy" "build_success_alert" {
   count = var.enable_monitoring ? 1 : 0
   
-  display_name = "Android Build Duration Alert"
+  display_name = "Android Build Success Rate"
   combiner     = "OR"
   
   conditions {
-    display_name = "Long build duration condition"
+    display_name = "Build success monitoring"
     
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/android_build_duration\""
+      filter          = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/android_build_success\""
       duration        = "300s"
-      comparison      = "COMPARISON_GREATER_THAN"
-      threshold_value = 1800 # 30 minutes
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
       
       aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_MEAN"
+        alignment_period   = "600s"
+        per_series_aligner = "ALIGN_RATE"
       }
     }
   }
@@ -79,26 +74,22 @@ resource "google_monitoring_alert_policy" "long_build_alert" {
     auto_close = "86400s"
   }
   
-  dynamic "notification_channels" {
-    for_each = var.notification_email != "" ? [1] : []
-    content {
-      notification_channels = [google_monitoring_notification_channel.email_channel[0].id]
-    }
-  }
+  # Add notification channels if email is provided
+  notification_channels = var.notification_email != "" ? [google_monitoring_notification_channel.email_channel[0].id] : []
   
   depends_on = [
-    google_logging_metric.android_build_duration,
     google_project_service.required_apis
   ]
 }
 
-# Custom dashboard for Android CI/CD metrics
+# Fixed dashboard for Android CI/CD metrics
 resource "google_monitoring_dashboard" "android_cicd_dashboard" {
   count = var.enable_monitoring ? 1 : 0
   
   dashboard_json = jsonencode({
     displayName = "Android CI/CD Pipeline Dashboard"
     mosaicLayout = {
+      columns = 12
       tiles = [
         {
           width  = 6
@@ -108,7 +99,7 @@ resource "google_monitoring_dashboard" "android_cicd_dashboard" {
             scorecard = {
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "metric.type=\"logging.googleapis.com/user/android_build_success\""
+                  filter = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/android_build_success\""
                   aggregation = {
                     alignmentPeriod    = "300s"
                     perSeriesAligner   = "ALIGN_RATE"
@@ -131,7 +122,7 @@ resource "google_monitoring_dashboard" "android_cicd_dashboard" {
             scorecard = {
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "metric.type=\"logging.googleapis.com/user/android_build_failures\""
+                  filter = "resource.type=\"global\" AND metric.type=\"logging.googleapis.com/user/android_build_failures\""
                   aggregation = {
                     alignmentPeriod    = "300s"
                     perSeriesAligner   = "ALIGN_RATE"
@@ -144,106 +135,19 @@ resource "google_monitoring_dashboard" "android_cicd_dashboard" {
               }
             }
           }
-        },
-        {
-          width = 12
-          height = 4
-          yPos  = 4
-          widget = {
-            title = "Build Duration Over Time"
-            xyChart = {
-              dataSets = [{
-                timeSeriesQuery = {
-                  timeSeriesFilter = {
-                    filter = "metric.type=\"logging.googleapis.com/user/android_build_duration\""
-                    aggregation = {
-                      alignmentPeriod    = "300s"
-                      perSeriesAligner   = "ALIGN_MEAN"
-                    }
-                  }
-                }
-                plotType = "LINE"
-              }]
-              yAxis = {
-                label = "Duration (seconds)"
-                scale = "LINEAR"
-              }
-              xAxis = {
-                scale = "LINEAR"
-              }
-            }
-          }
-        },
-        {
-          width = 6
-          height = 4
-          yPos  = 8
-          widget = {
-            title = "Storage Usage - Build Artifacts"
-            xyChart = {
-              dataSets = [{
-                timeSeriesQuery = {
-                  timeSeriesFilter = {
-                    filter = "metric.type=\"storage.googleapis.com/storage/total_bytes\" AND resource.labels.bucket_name=\"${google_storage_bucket.build_artifacts.name}\""
-                    aggregation = {
-                      alignmentPeriod    = "3600s"
-                      perSeriesAligner   = "ALIGN_MEAN"
-                    }
-                  }
-                }
-                plotType = "LINE"
-              }]
-              yAxis = {
-                label = "Bytes"
-                scale = "LINEAR"
-              }
-            }
-          }
-        },
-        {
-          width = 6
-          height = 4
-          xPos  = 6
-          yPos  = 8
-          widget = {
-            title = "Cloud Build Quota Usage"
-            xyChart = {
-              dataSets = [{
-                timeSeriesQuery = {
-                  timeSeriesFilter = {
-                    filter = "metric.type=\"serviceruntime.googleapis.com/quota/used\" AND resource.labels.service=\"cloudbuild.googleapis.com\""
-                    aggregation = {
-                      alignmentPeriod    = "3600s"
-                      perSeriesAligner   = "ALIGN_MEAN"
-                    }
-                  }
-                }
-                plotType = "LINE"
-              }]
-              yAxis = {
-                label = "Usage"
-                scale = "LINEAR"
-              }
-            }
-          }
         }
       ]
     }
   })
   
-  depends_on = [
-    google_logging_metric.android_build_success,
-    google_logging_metric.android_build_failures,
-    google_logging_metric.android_build_duration,
-    google_project_service.required_apis
-  ]
+  depends_on = [google_project_service.required_apis]
 }
 
-# Budget alert for cost monitoring
+# Budget alert for cost monitoring (only if billing account ID is provided)
 resource "google_billing_budget" "android_cicd_budget" {
-  count = var.enable_monitoring ? 1 : 0
+  count = var.enable_monitoring && var.billing_account_id != "" ? 1 : 0
   
-  billing_account = data.google_billing_account.account.id
+  billing_account = var.billing_account_id
   display_name    = "Android CI/CD Budget"
   
   budget_filter {
@@ -280,11 +184,6 @@ resource "google_billing_budget" "android_cicd_budget" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Get billing account info
-data "google_billing_account" "account" {
-  billing_account = var.billing_account_id
-}
-
 # Log sink for exporting build logs
 resource "google_logging_project_sink" "build_logs_sink" {
   count = var.enable_monitoring ? 1 : 0
@@ -310,30 +209,6 @@ resource "google_storage_bucket_iam_member" "log_sink_writer" {
   bucket = google_storage_bucket.build_artifacts.name
   role   = "roles/storage.objectCreator"
   member = google_logging_project_sink.build_logs_sink[0].writer_identity
-}
-
-# SLO for build success rate
-resource "google_monitoring_slo" "build_success_slo" {
-  count = var.enable_monitoring ? 1 : 0
-  
-  service      = google_monitoring_custom_service.android_cicd_service[0].service_id
-  display_name = "Build Success Rate SLO"
-  
-  request_based_sli {
-    good_total_ratio {
-      total_service_filter = "metric.type=\"logging.googleapis.com/user/android_build_success\" OR metric.type=\"logging.googleapis.com/user/android_build_failures\""
-      good_service_filter  = "metric.type=\"logging.googleapis.com/user/android_build_success\""
-    }
-  }
-  
-  goal = 0.95 # 95% success rate
-  
-  rolling_period_days = 30
-  
-  depends_on = [
-    google_logging_metric.android_build_success,
-    google_logging_metric.android_build_failures
-  ]
 }
 
 # Custom service for SLO

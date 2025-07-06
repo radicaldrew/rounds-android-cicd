@@ -1,18 +1,23 @@
 variable "project_id" {
   description = "The GCP project ID"
   type        = string
+  default = "rounds-android-cicd"
 }
 
 variable "region" {
   description = "The GCP region for resources"
   type        = string
-  default     = "us-central1"
+  default     = "me-west1"  
 }
 
 variable "webhook_url" {
-  description = "Webhook URL for rounds android build notifications"
-  type        = string
+  type = string
+  description = "Webhook URL for the build"
   default     = "https://webhook.site/your-unique-id"
+  validation {
+    condition     = can(regex("^https?://", var.webhook_url))
+    error_message = "The webhook_url must be a valid HTTP or HTTPS URL."
+  }
 }
 
 variable "github_repo_owner" {
