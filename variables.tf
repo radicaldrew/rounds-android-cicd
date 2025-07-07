@@ -20,24 +20,6 @@ variable "webhook_url" {
   }
 }
 
-variable "github_repo_owner" {
-  description = "GitHub repository owner"
-  type        = string
-  default     = ""
-}
-
-variable "github_repo_name" {
-  description = "GitHub repository name"
-  type        = string
-  default     = ""
-}
-
-variable "github_branch" {
-  description = "GitHub branch to build"
-  type        = string
-  default     = "main"
-}
-
 variable "build_timeout" {
   description = "Build timeout in seconds"
   type        = string
@@ -128,18 +110,6 @@ variable "enable_signing" {
   default     = false
 }
 
-variable "enable_kms_encryption" {
-  description = "Enable KMS encryption for signing secrets"
-  type        = bool
-  default     = true
-}
-
-variable "key_rotation_period" {
-  description = "KMS key rotation period in seconds"
-  type        = string
-  default     = "2592000s" # 30 days
-}
-
 variable "keystore_password" {
   description = "Keystore password (will be stored in Secret Manager)"
   type        = string
@@ -178,12 +148,6 @@ variable "gradle_memory" {
   default     = "3g"
 }
 
-variable "enable_debug_build" {
-  description = "Enable Android Debug build"
-  type        = bool
-  default     = false
-}
-
 variable "enable_lint" {
   description = "Enable Android lint checks"
   type        = bool
@@ -192,12 +156,6 @@ variable "enable_lint" {
 
 variable "enable_unit_tests" {
   description = "Enable unit tests"
-  type        = bool
-  default     = false
-}
-
-variable "enable_integration_tests" {
-  description = "Enable integration tests"
   type        = bool
   default     = false
 }

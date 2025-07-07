@@ -21,15 +21,6 @@ resource "google_project_service" "required_apis" {
   disable_dependent_services = true
 }
 
-# Data sources
-data "google_project" "project" {
-  project_id = var.project_id
-}
-
-data "google_compute_default_service_account" "default" {
-  depends_on = [google_project_service.required_apis]
-}
-
 # Cloud Storage buckets for the pipeline
 resource "google_storage_bucket" "source_uploads" {
   name          = "${var.project_id}-source-uploads"
