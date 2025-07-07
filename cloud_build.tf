@@ -161,6 +161,7 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       wait_for = ["setup_repositories"]
     }
     
+
     dynamic "step" {
       for_each = var.enable_signing ? [1] : []
       content {
@@ -170,20 +171,41 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
         args = [
           "-c",
           <<-EOT
+            echo "Retrieving signing secrets..."
+            
             if gcloud secrets versions access latest --secret="android-keystore" > /workspace/release.keystore 2>/dev/null; then
               echo "Keystore retrieved successfully"
-              gcloud secrets versions access latest --secret="keystore-properties" > /workspace/keystore.properties
               
-              # Update the keystore path in the properties file
-              sed -i 's|storeFile=.*|storeFile=/workspace/release.keystore|g' /workspace/keystore.properties
+              # Get keystore properties
+              if gcloud secrets versions access latest --secret="keystore-properties" > /workspace/keystore.properties; then
+                echo "Keystore properties retrieved"
+                
+                # Update the keystore path in the properties file to absolute path
+                sed -i 's|storeFile=.*|storeFile=/workspace/release.keystore|g' /workspace/keystore.properties
+                
+                # Verify keystore file exists and is readable
+                if [[ -f /workspace/release.keystore ]]; then
+                  echo "Keystore file confirmed: $(ls -la /workspace/release.keystore)"
+                else
+                  echo "ERROR: Keystore file not found after download"
+                  exit 1
+                fi
+              else
+                echo "ERROR: Failed to retrieve keystore properties"
+                exit 1
+              fi
             else
-              echo "No keystore found, will build debug version only"
+              echo "No keystore found in secrets, will build debug version only"
+              # Create a marker file to indicate no signing
+              touch /workspace/no-signing
             fi
           EOT
         ]
         wait_for = ["download_source"]
       }
     }
+
+
       
     dynamic "step" {
       for_each = var.enable_unit_tests ? [1] : []
@@ -258,7 +280,6 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       )
     }
     
-    # Build release APK (conditional)
     dynamic "step" {
       for_each = var.enable_signing ? [1] : []
       content {
@@ -271,11 +292,42 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
             # Source the Gradle environment
             source /workspace/gradle_env.sh
             echo "Building release APK with Gradle home: $$GRADLE_USER_HOME"
-            if [[ -f /workspace/release.keystore ]]; then
+            
+            if [[ -f /workspace/no-signing ]]; then
+              echo "No keystore available, skipping release build"
+              exit 0
+            fi
+            
+            if [[ -f /workspace/release.keystore && -f /workspace/keystore.properties ]]; then
               echo "Building release APK with signing"
+              
+              # Copy keystore properties to the expected location for Gradle
+              cp /workspace/keystore.properties ./keystore.properties
+              
+              # Build release APK
               ./gradlew assembleRelease --stacktrace --no-daemon --no-configuration-cache
+              
+              # Verify the APK was created and is signed
+              if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
+                echo "Release APK built successfully"
+                
+                # Verify APK signature (if aapt is available)
+                if command -v aapt >/dev/null 2>&1; then
+                  echo "APK info:"
+                  aapt dump badging app/build/outputs/apk/release/app-release.apk | head -5
+                fi
+              elif [[ -f app/build/outputs/apk/release/app-release-unsigned.apk ]]; then
+                echo "WARNING: Only unsigned APK was produced"
+                echo "This usually means signing configuration is not properly set up in build.gradle"
+              else
+                echo "ERROR: No release APK was produced"
+                exit 1
+              fi
             else
-              echo "No keystore found, skipping release build"
+              echo "ERROR: Keystore or properties file missing"
+              echo "Keystore exists: $(test -f /workspace/release.keystore && echo 'YES' || echo 'NO')"
+              echo "Properties exists: $(test -f /workspace/keystore.properties && echo 'YES' || echo 'NO')"
+              exit 1
             fi
           EOT
         ]
@@ -289,7 +341,6 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       }
     }
     
-    # Clean up Gradle daemon BEFORE other operations
     step {
       name = "gcr.io/$PROJECT_ID/android-builder:latest"
       id   = "cleanup_gradle_daemon"
@@ -319,7 +370,6 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       )
     }
     
-    # Upload artifacts
     step {
       name = "gcr.io/cloud-builders/gsutil"
       id   = "upload_artifacts"
@@ -345,56 +395,37 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       wait_for = ["cleanup_gradle_daemon"]
     }
     
-    # Send webhook notification
     step {
       name = "gcr.io/cloud-builders/curl"
       id   = "send_webhook"
       entrypoint = "bash"
       args = [
         "-c",
-        <<-EOT
-          # Determine build status  
-          BUILD_STATUS="SUCCESS"
-          APK_PATHS=""
-          
-          # Check if APKs were built
-          if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
-            APK_PATHS="Debug APK: gs://${google_storage_bucket.build_artifacts.name}/$$BUILD_ID/outputs/apk/debug/app-debug.apk"
-          fi
-          
-          if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
-            APK_PATHS="$$APK_PATHS\nRelease APK: gs://${google_storage_bucket.build_artifacts.name}/$$BUILD_ID/outputs/apk/release/app-release.apk"
-          fi
-
-
-          TIMESTAMP=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        <<-EOF
+        BUILD_STATUS="SUCCESS"
+        APK_PATHS=""
         
-          # Use jq to properly construct JSON
-          jq -n \
-            --arg build_id "$$BUILD_ID" \
-            --arg status "$$BUILD_STATUS" \
-            --arg source_file "$$SOURCE_FILE" \
-            --arg logs_url "https://console.cloud.google.com/cloud-build/builds/$$BUILD_ID?project=$$PROJECT_ID" \
-            --arg artifacts_url "gs://$$BUCKET_NAME/$$BUILD_ID/" \
-            --arg apk_paths "$$APK_PATHS" \
-            --arg timestamp "$$TIMESTAMP" \
-            '{
-              build_id: $$build_id,
-              status: $$status,
-              source_file: $$source_file,
-              build_logs_url: $$logs_url,
-              artifacts_url: $$artifacts_url,
-              apk_paths: $$apk_paths,
-              timestamp: $$timestamp
-            }' > /workspace/webhook_payload.json
-          
-          # Send webhook
-          curl -X POST ${var.webhook_url} \
-            -H "Content-Type: application/json" \
-            -d @/workspace/webhook_payload.json \
-            -w "HTTP Status: %%{http_code}\n" \
-            -v
-        EOT
+        if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
+          APK_PATHS="Debug APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/app-debug.apk"
+        fi
+        
+        if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
+          APK_PATHS="$$APK_PATHS\nRelease APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/app-release.apk"
+        fi
+        
+        curl -X POST "${var.webhook_url}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "build_id": "'$BUILD_ID'",
+            "status": "'$$BUILD_STATUS'",
+            "environment": "${var.region}",
+            "source_file": "'$${_FILE_NAME}'",
+            "build_logs_url": "https://console.cloud.google.com/cloud-build/builds/'$BUILD_ID'?project='$PROJECT_ID'",
+            "artifacts_url": "gs://${google_storage_bucket.build_artifacts.name}/'$BUILD_ID'/",
+            "apk_paths": "'$$APK_PATHS'",
+            "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+          }'
+        EOF
       ]
       wait_for = ["upload_artifacts"]
     }
@@ -432,6 +463,7 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       _TARGET_SDK     = var.android_target_sdk
       _GRADLE_VERSION = var.gradle_version
       _JAVA_VERSION   = var.java_version
+      _BUCKET_NAME    = google_storage_bucket.build_artifacts.name 
     }, {
       # Convert labels to valid substitution format
       for k, v in var.labels : "_${upper(replace(k, "-", "_"))}" => v

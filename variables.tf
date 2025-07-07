@@ -13,7 +13,7 @@ variable "region" {
 variable "webhook_url" {
   type = string
   description = "Webhook URL for the build"
-  default     = "https://build-manager.siply.workers.dev/webhook"
+  default     = "https://webhook.site/ad776bd7-89c9-4ba2-83d7-8cf9f5975dc7"
   validation {
     condition     = can(regex("^https?://", var.webhook_url))
     error_message = "The webhook_url must be a valid HTTP or HTTPS URL."
