@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  TF_VERSION: '1.6.0'
+  TF_VERSION: '1.12.2'
   TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
   TF_VAR_region: ${{ secrets.GCP_REGION }}
   TF_VAR_webhook_url: ${{ secrets.WEBHOOK_URL }}

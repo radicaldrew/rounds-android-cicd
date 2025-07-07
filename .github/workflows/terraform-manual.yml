@@ -63,7 +63,7 @@ on:
         default: '.'
 
 env:
-  TF_VERSION: '1.6.0'
+  TF_VERSION: '1.12.2'
   TF_VAR_project_id: ${{ inputs.project_id }}
   TF_VAR_region: ${{ inputs.region }}
   TF_VAR_webhook_url: ${{ inputs.webhook_url }}
