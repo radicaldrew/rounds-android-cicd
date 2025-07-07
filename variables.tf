@@ -178,6 +178,12 @@ variable "gradle_memory" {
   default     = "3g"
 }
 
+variable "enable_debug_build" {
+  description = "Enable Android Debug build"
+  type        = bool
+  default     = false
+}
+
 variable "enable_lint" {
   description = "Enable Android lint checks"
   type        = bool

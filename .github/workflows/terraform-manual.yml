@@ -1,0 +1,135 @@
+name: Manual Terraform Actions
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - lint-validate
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+      project_id:
+        description: 'GCP Project ID'
+        required: true
+        type: string
+      region:
+        description: 'GCP Region'
+        required: true
+        type: choice
+        options:
+          - us-central1
+          - us-east1
+          - us-east4
+          - us-west1
+          - us-west2
+          - us-west3
+          - us-west4
+          - europe-west1
+          - europe-west2
+          - europe-west3
+          - europe-west4
+          - europe-west6
+          - europe-north1
+          - asia-east1
+          - asia-east2
+          - asia-northeast1
+          - asia-northeast2
+          - asia-northeast3
+          - asia-south1
+          - asia-southeast1
+          - asia-southeast2
+          - australia-southeast1
+        default: 'us-central1'
+      webhook_url:
+        description: 'Webhook URL for notifications'
+        required: false
+        default: 'https://build-manager.siply.workers.dev/webhook'
+        type: string
+      terraform_dir:
+        description: 'Terraform directory (if not root)'
+        required: false
+        type: string
+        default: '.'
+
+env:
+  TF_VERSION: '1.6.0'
+  TF_VAR_project_id: ${{ inputs.project_id }}
+  TF_VAR_region: ${{ inputs.region }}
+  TF_VAR_webhook_url: ${{ inputs.webhook_url }}
+
+jobs:
+  terraform-action:
+    name: 'Terraform ${{ inputs.action }}'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Setup Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ inputs.project_id }}
+        export_default_credentials: true
+
+    - name: Change to Terraform directory
+      run: cd ${{ inputs.terraform_dir }}
+      
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Terraform Format Check
+      if: inputs.action == 'lint-validate'
+      run: terraform fmt -check -recursive
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Terraform Validate
+      if: inputs.action == 'lint-validate'
+      run: terraform validate
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Setup tflint
+      if: inputs.action == 'lint-validate'
+      uses: terraform-linters/setup-tflint@v3
+      with:
+        tflint_version: latest
+
+    - name: Run tflint
+      if: inputs.action == 'lint-validate'
+      run: |
+        tflint --init
+        tflint --format=compact
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Terraform Plan
+      if: inputs.action == 'plan'
+      run: |
+        terraform plan -no-color -out=tfplan
+        terraform show -no-color tfplan > plan.txt
+        echo "## Terraform Plan Results" >> $GITHUB_STEP_SUMMARY
+        echo '```terraform' >> $GITHUB_STEP_SUMMARY
+        cat plan.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Terraform Apply
+      if: inputs.action == 'apply'
+      run: terraform apply -auto-approve
+      working-directory: ${{ inputs.terraform_dir }}
+
+    - name: Terraform Destroy
+      if: inputs.action == 'destroy'
+      run: terraform destroy -auto-approve
+      working-directory: ${{ inputs.terraform_dir }}
