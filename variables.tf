@@ -125,7 +125,7 @@ variable "java_version" {
 variable "enable_signing" {
   description = "Enable APK signing with keystore"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_kms_encryption" {

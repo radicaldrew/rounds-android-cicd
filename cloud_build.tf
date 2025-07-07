@@ -402,29 +402,60 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       args = [
         "-c",
         <<-EOF
+        # Get Cloud Build variables
+        BUILD_ID="$BUILD_ID"
+        PROJECT_ID="$PROJECT_ID"
+        SOURCE_FILE="$_FILE_NAME"
+        
+        # Set build status
         BUILD_STATUS="SUCCESS"
         APK_PATHS=""
         
+        # Check for debug APK
         if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
-          APK_PATHS="Debug APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/app-debug.apk"
+          APK_PATHS="Debug APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/outputs/apk/debug/app-debug.apk"
         fi
         
+        # Check for release APK
         if [[ -f app/build/outputs/apk/release/app-release.apk ]]; then
-          APK_PATHS="$$APK_PATHS\nRelease APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/app-release.apk"
+          if [[ -n "$$APK_PATHS" ]]; then
+            APK_PATHS="$$APK_PATHS\\nRelease APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/outputs/apk/release/app-release.apk"
+          else
+            APK_PATHS="Release APK: gs://${google_storage_bucket.build_artifacts.name}/$BUILD_ID/outputs/apk/release/app-release.apk"
+          fi
         fi
         
-        curl -X POST "${var.webhook_url}" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "build_id": "'$BUILD_ID'",
-            "status": "'$$BUILD_STATUS'",
-            "environment": "${var.region}",
-            "source_file": "'$${_FILE_NAME}'",
-            "build_logs_url": "https://console.cloud.google.com/cloud-build/builds/'$BUILD_ID'?project='$PROJECT_ID'",
-            "artifacts_url": "gs://${google_storage_bucket.build_artifacts.name}/'$BUILD_ID'/",
-            "apk_paths": "'$$APK_PATHS'",
-            "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-          }'
+        # Get current timestamp
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        # Create JSON payload
+        cat > payload.json << JSON_EOF
+    {
+      "build_id": "$BUILD_ID",
+      "status": "$$BUILD_STATUS",
+      "environment": "${var.region}",
+      "source_file": "$$SOURCE_FILE",
+      "build_logs_url": "https://console.cloud.google.com/cloud-build/builds/$$BUILD_ID?project=$PROJECT_ID",
+      "artifacts_url": "gs://${google_storage_bucket.build_artifacts.name}/$$BUILD_ID/",
+      "apk_paths": "$$APK_PATHS",
+      "timestamp": "$$TIMESTAMP"
+    }
+    JSON_EOF
+        
+        # Debug: Show the payload
+        echo "Webhook payload:"
+        cat payload.json
+        
+        # Send webhook
+        if [[ -n "${var.webhook_url}" && "${var.webhook_url}" != "" ]]; then
+          echo "Sending webhook to: ${var.webhook_url}"
+          curl -X POST "${var.webhook_url}" \
+            -H "Content-Type: application/json" \
+            -d @payload.json \
+            -w "HTTP Status: %%{http_code}\n"
+        else
+          echo "No webhook URL configured, skipping webhook notification"
+        fi
         EOF
       ]
       wait_for = ["upload_artifacts"]
