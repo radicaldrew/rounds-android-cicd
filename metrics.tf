@@ -7,7 +7,7 @@ resource "google_logging_metric" "android_build_success" {
     jsonPayload.status="SUCCESS"
     jsonPayload.substitutions._PIPELINE_TYPE="android"
   EOT
-  
+
   depends_on = [google_project_service.required_apis]
 }
 
@@ -19,7 +19,7 @@ resource "google_logging_metric" "android_build_failures" {
     jsonPayload.status="FAILURE"
     jsonPayload.substitutions._PIPELINE_TYPE="android"
   EOT
-  
+
   depends_on = [google_project_service.required_apis]
 }
 
@@ -32,6 +32,6 @@ resource "google_logging_metric" "android_build_duration" {
     jsonPayload.status="SUCCESS"
     jsonPayload.substitutions._PIPELINE_TYPE="android"
   EOT
-  
+
   depends_on = [google_project_service.required_apis]
 }

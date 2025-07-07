@@ -1,25 +1,25 @@
 # Cloud Build trigger for Pub/Sub events
 resource "google_cloudbuild_trigger" "android_build_trigger" {
-  name        = "android-build-trigger"
-  location    = "global"
-  description = "Trigger for Android CI/CD builds"
+  name            = "android-build-trigger"
+  location        = "global"
+  description     = "Trigger for Android CI/CD builds"
   service_account = google_service_account.cloud_build_sa.id
-  
+
   pubsub_config {
     topic = google_pubsub_topic.android_app_uploads.id
   }
- 
+
   build {
     timeout = var.build_timeout
-    
+
     options {
-      machine_type = var.enable_cost_optimization ? null : var.machine_type
-      logging      = "CLOUD_LOGGING_ONLY"
+      machine_type        = var.enable_cost_optimization ? null : var.machine_type
+      logging             = "CLOUD_LOGGING_ONLY"
       substitution_option = "ALLOW_LOOSE"
-      disk_size_gb = var.enable_cost_optimization ? null : var.disk_size_gb
-      worker_pool = var.enable_cost_optimization ? google_cloudbuild_worker_pool.cost_optimized_pool.id : null
+      disk_size_gb        = var.enable_cost_optimization ? null : var.disk_size_gb
+      worker_pool         = var.enable_cost_optimization ? google_cloudbuild_worker_pool.cost_optimized_pool.id : null
     }
-    
+
     # Download source from Cloud Storage
     step {
       name       = "gcr.io/cloud-builders/gsutil"
@@ -42,8 +42,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     }
 
     step {
-      name = "gcr.io/cloud-builders/gsutil"
-      id   = "extract_cache"
+      name       = "gcr.io/cloud-builders/gsutil"
+      id         = "extract_cache"
       entrypoint = "bash"
       args = [
         "-c",
@@ -61,8 +61,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
 
     # Initialize Gradle environment - CRITICAL: Do this once at the start
     step {
-      name = "gcr.io/$PROJECT_ID/android-builder:latest"
-      id   = "init_gradle_environment"
+      name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+      id         = "init_gradle_environment"
       entrypoint = "bash"
       args = [
         "-c",
@@ -97,8 +97,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     }
 
     step {
-      name = "gcr.io/$PROJECT_ID/android-builder:latest"
-      id   = "setup_repositories"
+      name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+      id         = "setup_repositories"
       entrypoint = "bash"
       args = [
         "-c",
@@ -125,8 +125,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     }
 
     step {
-      name = "gcr.io/$PROJECT_ID/android-builder:latest"
-      id   = "resolve_dependencies"
+      name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+      id         = "resolve_dependencies"
       entrypoint = "bash"
       args = [
         "-c",
@@ -160,13 +160,13 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       ]
       wait_for = ["setup_repositories"]
     }
-    
+
 
     dynamic "step" {
       for_each = var.enable_signing ? [1] : []
       content {
-        name = "gcr.io/cloud-builders/gcloud"
-        id   = "get_secrets"
+        name       = "gcr.io/cloud-builders/gcloud"
+        id         = "get_secrets"
         entrypoint = "bash"
         args = [
           "-c",
@@ -206,12 +206,12 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     }
 
 
-      
+
     dynamic "step" {
       for_each = var.enable_unit_tests ? [1] : []
       content {
-        name = "gcr.io/$PROJECT_ID/android-builder:latest"
-        id   = "unit_tests"
+        name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+        id         = "unit_tests"
         entrypoint = "bash"
         args = [
           "-c",
@@ -233,8 +233,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     dynamic "step" {
       for_each = var.enable_lint ? [1] : []
       content {
-        name = "gcr.io/$PROJECT_ID/android-builder:latest"
-        id   = "lint_checks"
+        name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+        id         = "lint_checks"
         entrypoint = "bash"
         args = [
           "-c",
@@ -257,8 +257,8 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
     }
 
     step {
-      name = "gcr.io/$PROJECT_ID/android-builder:latest"
-      id   = "build_debug"
+      name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+      id         = "build_debug"
       entrypoint = "bash"
       args = [
         "-c",
@@ -279,12 +279,12 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
         var.enable_lint ? ["lint_checks"] : []
       )
     }
-    
+
     dynamic "step" {
       for_each = var.enable_signing ? [1] : []
       content {
-        name = "gcr.io/$PROJECT_ID/android-builder:latest"
-        id   = "build_release"
+        name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+        id         = "build_release"
         entrypoint = "bash"
         args = [
           "-c",
@@ -340,10 +340,10 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
         )
       }
     }
-    
+
     step {
-      name = "gcr.io/$PROJECT_ID/android-builder:latest"
-      id   = "cleanup_gradle_daemon"
+      name       = "gcr.io/$PROJECT_ID/android-builder:latest"
+      id         = "cleanup_gradle_daemon"
       entrypoint = "bash"
       args = [
         "-c",
@@ -369,10 +369,10 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
         var.enable_signing ? ["build_release"] : []
       )
     }
-    
+
     step {
-      name = "gcr.io/cloud-builders/gsutil"
-      id   = "upload_artifacts"
+      name       = "gcr.io/cloud-builders/gsutil"
+      id         = "upload_artifacts"
       entrypoint = "bash"
       args = [
         "-c",
@@ -394,10 +394,10 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       ]
       wait_for = ["cleanup_gradle_daemon"]
     }
-    
+
     step {
-      name = "gcr.io/cloud-builders/curl"
-      id   = "send_webhook"
+      name       = "gcr.io/cloud-builders/curl"
+      id         = "send_webhook"
       entrypoint = "bash"
       args = [
         "-c",
@@ -460,11 +460,11 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       ]
       wait_for = ["upload_artifacts"]
     }
-    
+
     # Save cache
     step {
-      name = "gcr.io/cloud-builders/gsutil"
-      id   = "save_cache"
+      name       = "gcr.io/cloud-builders/gsutil"
+      id         = "save_cache"
       entrypoint = "bash"
       args = [
         "-c",
@@ -484,9 +484,9 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       ]
       wait_for = ["send_webhook"]
     }
-    
+
     substitutions = merge({
-      _FILE_NAME      = "app.zip"  # Default value
+      _FILE_NAME      = "app.zip" # Default value
       _WEBHOOK_URL    = var.webhook_url
       _PIPELINE_TYPE  = "android"
       _COMPILE_SDK    = var.android_compile_sdk
@@ -494,13 +494,13 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
       _TARGET_SDK     = var.android_target_sdk
       _GRADLE_VERSION = var.gradle_version
       _JAVA_VERSION   = var.java_version
-      _BUCKET_NAME    = google_storage_bucket.build_artifacts.name 
-    }, {
+      _BUCKET_NAME    = google_storage_bucket.build_artifacts.name
+      }, {
       # Convert labels to valid substitution format
       for k, v in var.labels : "_${upper(replace(k, "-", "_"))}" => v
     })
   }
-  
+
   depends_on = [
     google_project_service.required_apis,
     google_project_iam_member.cloud_build_sa_roles
@@ -509,32 +509,32 @@ resource "google_cloudbuild_trigger" "android_build_trigger" {
 
 # Cloud Build trigger for manual builds
 resource "google_cloudbuild_trigger" "android_manual_trigger" {
-  name        = "android-manual-trigger"
-  description = "Manual trigger for Android CI/CD builds"
+  name            = "android-manual-trigger"
+  description     = "Manual trigger for Android CI/CD builds"
   service_account = google_service_account.cloud_build_sa.id
-  
+
   # Manual trigger configuration
   trigger_template {
-    tag_name = "manual-trigger"
+    tag_name   = "manual-trigger"
     project_id = var.project_id
     repo_name  = "manual-trigger"
   }
-  
+
   build {
     timeout = var.build_timeout
-    
+
     options {
-      machine_type = var.enable_cost_optimization ? null : var.machine_type
-      logging      = "CLOUD_LOGGING_ONLY"
+      machine_type        = var.enable_cost_optimization ? null : var.machine_type
+      logging             = "CLOUD_LOGGING_ONLY"
       substitution_option = "ALLOW_LOOSE"
-      disk_size_gb = var.enable_cost_optimization ? null : var.disk_size_gb
-      worker_pool = var.enable_cost_optimization ? google_cloudbuild_worker_pool.cost_optimized_pool.id : null
+      disk_size_gb        = var.enable_cost_optimization ? null : var.disk_size_gb
+      worker_pool         = var.enable_cost_optimization ? google_cloudbuild_worker_pool.cost_optimized_pool.id : null
     }
-    
+
     # Simple build step for manual trigger
     step {
-      name = "gcr.io/cloud-builders/gsutil"
-      id   = "download_source"
+      name       = "gcr.io/cloud-builders/gsutil"
+      id         = "download_source"
       entrypoint = "bash"
       args = [
         "-c",
@@ -551,7 +551,7 @@ resource "google_cloudbuild_trigger" "android_manual_trigger" {
         EOT
       ]
     }
-    
+
     substitutions = merge({
       _FILE_NAME      = "app.zip"
       _WEBHOOK_URL    = var.webhook_url
@@ -563,7 +563,7 @@ resource "google_cloudbuild_trigger" "android_manual_trigger" {
       _JAVA_VERSION   = var.java_version
     }, var.labels)
   }
-  
+
   depends_on = [
     google_project_service.required_apis,
     google_project_iam_member.cloud_build_sa_roles

@@ -1,17 +1,17 @@
 variable "project_id" {
   description = "The GCP project ID"
   type        = string
-  default = "rounds-android-cicd"
+  default     = "rounds-android-cicd"
 }
 
 variable "region" {
   description = "The GCP region for resources"
   type        = string
-  default     = "us-central1"  
+  default     = "us-central1"
 }
 
 variable "webhook_url" {
-  type = string
+  type        = string
   description = "Webhook URL for the build"
   default     = "https://webhook.site/ad776bd7-89c9-4ba2-83d7-8cf9f5975dc7"
   validation {

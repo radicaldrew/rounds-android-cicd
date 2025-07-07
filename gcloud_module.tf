@@ -4,11 +4,11 @@
 # Secret for future webhook triggers
 resource "google_secret_manager_secret" "webhook_trigger_secret" {
   secret_id = "webhook-trigger-secret"
-  
+
   replication {
     auto {}
   }
-  
+
   depends_on = [google_project_service.required_apis]
 }
 
@@ -24,7 +24,7 @@ resource "random_id" "webhook_secret" {
 # Output instructions for manual image building
 output "build_android_image_instructions" {
   description = "Instructions to build the Android builder image"
-  value = <<-EOT
+  value       = <<-EOT
 # To build the Android builder image manually:
 
 ## Step 1: Create Dockerfile

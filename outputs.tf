@@ -101,17 +101,17 @@ output "webhook_url" {
 output "build_configuration" {
   description = "Summary of build configuration"
   value = {
-    machine_type          = var.machine_type
-    disk_size_gb         = var.disk_size_gb
-    build_timeout        = var.build_timeout
-    enable_signing       = var.enable_signing
-    enable_unit_tests    = var.enable_unit_tests
-    enable_lint          = var.enable_lint
-    enable_monitoring    = var.enable_monitoring
-    cost_optimization    = var.enable_cost_optimization
-    parallel_builds      = var.enable_parallel_builds
-    gradle_max_workers   = var.gradle_max_workers
-    gradle_memory        = var.gradle_memory
+    machine_type       = var.machine_type
+    disk_size_gb       = var.disk_size_gb
+    build_timeout      = var.build_timeout
+    enable_signing     = var.enable_signing
+    enable_unit_tests  = var.enable_unit_tests
+    enable_lint        = var.enable_lint
+    enable_monitoring  = var.enable_monitoring
+    cost_optimization  = var.enable_cost_optimization
+    parallel_builds    = var.enable_parallel_builds
+    gradle_max_workers = var.gradle_max_workers
+    gradle_memory      = var.gradle_memory
   }
 }
 
@@ -129,9 +129,9 @@ output "android_configuration" {
 output "retention_policies" {
   description = "Configured retention policies"
   value = {
-    source_retention_days    = var.source_retention_days
-    artifact_retention_days  = var.artifact_retention_days
-    cache_retention_days     = var.cache_retention_days
+    source_retention_days   = var.source_retention_days
+    artifact_retention_days = var.artifact_retention_days
+    cache_retention_days    = var.cache_retention_days
   }
 }
 
@@ -155,7 +155,7 @@ output "monitoring_resources" {
 
 output "setup_instructions" {
   description = "Instructions for setting up the pipeline"
-  value = <<-EOT
+  value       = <<-EOT
 # Android CI/CD Pipeline Setup Instructions
 
 ## 1. Build Android Builder Image
@@ -233,18 +233,18 @@ output "cost_optimization_info" {
     worker_pool        = var.enable_cost_optimization ? "Using cost-optimized worker pool" : "Standard workers"
     cache_enabled      = "Build cache enabled for faster builds"
     lifecycle_policies = "Automatic cleanup of old artifacts"
-    recommendations   = var.enable_cost_optimization ? "Already optimized" : "Consider enabling cost optimization"
+    recommendations    = var.enable_cost_optimization ? "Already optimized" : "Consider enabling cost optimization"
   }
 }
 
 output "security_info" {
   description = "Security configuration"
   value = {
-    service_account     = "Dedicated service account: ${google_service_account.cloud_build_sa.email}"
-    secret_manager     = "Keystore secrets managed via Secret Manager"
-    iam_roles          = "Principle of least privilege applied"
-    bucket_security    = "Uniform bucket-level access enabled"
-    build_isolation    = "Isolated build environment per execution"
+    service_account = "Dedicated service account: ${google_service_account.cloud_build_sa.email}"
+    secret_manager  = "Keystore secrets managed via Secret Manager"
+    iam_roles       = "Principle of least privilege applied"
+    bucket_security = "Uniform bucket-level access enabled"
+    build_isolation = "Isolated build environment per execution"
   }
 }
 
@@ -256,7 +256,7 @@ output "webhook_secret_name" {
 
 output "next_steps" {
   description = "What to do after deployment"
-  value = <<-EOT
+  value       = <<-EOT
 🎉 Infrastructure deployed successfully!
 
 Next steps:
