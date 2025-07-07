@@ -15,6 +15,7 @@ on:
         default: 'plan'
       project_id:
         description: 'GCP Project ID'
+        default: 'rounds-android-cicd'
         required: true
         type: string
       region:
